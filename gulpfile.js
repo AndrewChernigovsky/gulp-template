@@ -1,101 +1,220 @@
-"use strict";
+const {src,dest,series,parallel,watch} = require('gulp'),
+autoprefixer = require('gulp-autoprefixer'),
+sourcemaps = require('gulp-sourcemaps'),
+plumber = require('gulp-plumber'),
+pug = require('gulp-pug'),
+del = require('del'),
+cssmin = require('gulp-clean-css'),
+sass = require('gulp-sass')(require('sass')),
+uglify = require('gulp-uglify'),
+babel = require('gulp-babel'),
+htmlmin = require('gulp-htmlmin'),
+imagemin = require('gulp-imagemin'),
+rename = require("gulp-rename"),
+webp = require("gulp-webp"),
+svgstore = require("gulp-svgstore"),
+sync = require('browser-sync').create(),
+ttf2woff = require('gulp-ttf2woff'),
+ttf2woff2 = require('gulp-ttf2woff2'),
+notify = require('gulp-notify'),
+qgcmq = require('gulp-group-css-media-queries'),
+concat = require('gulp-concat');
 
-var gulp = require("gulp");
-var plumber = require("gulp-plumber");
-var sourcemap = require("gulp-sourcemaps");
-var sass = require("gulp-sass");
-var postcss = require("gulp-postcss");
-var autoprefixer = require("autoprefixer");
-var server = require("browser-sync").create();
-var csso = require("gulp-csso");
-var rename = require("gulp-rename");
-var imagemin = require("gulp-imagemin");
-var webp = require("gulp-webp");
-var svgstore = require("gulp-svgstore")
-var posthtml = require("gulp-posthtml");
-var include = require("posthtml-include");
-var del = require("del");
+// function copyFonts() {
+// return src(['source/fonts/*.ttf'])
+// .pipe(dest('production/fonts/'))
+// }
 
-gulp.task("css", function () {
-  return gulp.src("source/sass/style.scss")
+// function fontW() {
+//   return src(['source/fonts/*.ttf'])
+//     .pipe(ttf2woff())
+//     .pipe(dest('production/fonts/'));
+// };
+
+function fonts() {
+    return src(['source/fonts/*.ttf'])
+    .pipe(dest('production/fonts/'));
+
+    return src(['source/fonts/*.ttf'])
+    .pipe(ttf2woff2())
+    .pipe(dest('production/fonts/'));
+
+    return src(['source/fonts/*.ttf'])
+    .pipe(ttf2woff())
+    .pipe(dest('production/fonts/'));
+};
+
+function clean() {
+  return del('production');
+}
+
+function pug2html() {
+  return src('source/pug/pages/*.pug')
     .pipe(plumber())
-    .pipe(sourcemap.init())
+    .pipe(pug({pretty: true}))
+    .pipe(plumber.stop())
+    .pipe(dest('production/'))
+    .pipe(sync.stream())
+}
+
+function html() {
+  return src("production/*.html")
+    .pipe(htmlmin({ collapseWhitespace: true }))
+    .pipe(dest("production/"))
+    .pipe(sync.stream())
+}
+
+function scss2css() {
+  return src('source/sass/styles.scss')
+    .pipe(plumber({errorHandler: notify.onError('Error: <%= error.message %>')}))
+    .pipe(sourcemaps.init())
     .pipe(sass())
-    .pipe(postcss([ autoprefixer() ]))
-    .pipe(csso())
-    .pipe(rename("style.min.css"))
-    .pipe(sourcemap.write("."))
-    .pipe(gulp.dest("build/css"))
-    .pipe(server.stream());
-});
+    .pipe(autoprefixer())
+    .pipe(qgcmq())
+    .pipe(cssmin())
+    .pipe(sourcemaps.write())
+    .pipe(rename('style.min.css'))
+    .pipe(dest('production/css/'))
+    .pipe(sync.stream())
+}
 
-gulp.task("server", function () {
-  server.init({
-    server: "build/",
-    notify: false,
-    open: true,
-    cors: true,
-    ui: false
-  });
+function script() {
+  return src(["source/js/**/*.js","!source/js/libs/**/*.js"])
+    .pipe(sourcemaps.init())
+    .pipe(babel({
+      presets: [['@babel/env', {"modules": false}]]
+    }))
+    .pipe(uglify())
+    .pipe(concat('main.js'))
+    .pipe(sourcemaps.write())
+    .pipe(rename('main.min.js'))
+    .pipe(dest('production/js/'))
+    .pipe(sync.stream());
+}
 
-  gulp.watch("source/sass/**/*.{scss,sass}", gulp.series("css"));
-  gulp.watch("source/img/icon-*.svg", gulp.series("sprite", "html", "refresh"));
-  gulp.watch("source/*.html", gulp.series("html", "refresh"));
-});
+function copyLibs() {
+  return src(['source/js/libs/**/*.js'])
+  .pipe(dest('production/js/libs/'))
+}
 
-gulp.task("refresh", function (done) {
-  server.reload();
-  done();
-});
-
-gulp.task("images", function() {
-  return gulp.src("source/img/**/*.{png,jpg,svg}")
+function imageMin () {
+  return src("source/image/**/*.{png,jpg,svg}")
     .pipe(imagemin([
-      imagemin.optipng({optimizationLevel: 3}),
-      imagemin.jpegtran({progressive: true}),
+      imagemin.mozjpeg({progressive: true}),
+      imagemin.optipng({optimizationLevel: 6}),
       imagemin.svgo()
     ]))
+    .pipe(dest("production/image"))
+    .pipe(sync.stream())
+}
 
-    .pipe(gulp.dest("source/img"));
+function copyImages() {
+  return src("source/image/**/*.{png,jpg,svg}")
+    .pipe(dest("production/image"))
+    .pipe(sync.stream())
 
-});
+}
 
-gulp.task("webp", function () {
-  return gulp.src("source/img/**/*.{png,jpg}")
-    .pipe(webp({quality: 90}))
-    .pipe(gulp.dest("source/img"));
-});
-
-gulp.task("sprite", function () {
-  return gulp.src("source/img/{icon-*,htmlacademy*}.svg")
-    .pipe(svgstore({inlineSvg: true}))
-    .pipe(rename("sprite_auto.svg"))
-    .pipe(gulp.dest("build/img"));
-});
-
-gulp.task("html", function () {
-  return gulp.src("source/*.html")
-    .pipe(posthtml([
-      include()
-    ]))
-    .pipe(gulp.dest("build"));
-});
-
-gulp.task("copy", function () {
-  return gulp.src([
-    "source/fonts/**/*.{woff,woff2}",
-    "source/img/**",
-    "source/js/**",
-    "source//*.ico"
+function copy (done){
+  return src([
+    "source/fonts/*.{woff2,woff}",
+    "source/*.ico",
+    "source/image/**/*.svg",
+    "!source/image/icons/*.svg",
     ], {
       base: "source"
     })
-  .pipe(gulp.dest("build"));
-});
+    .pipe(dest("production"))
+    .pipe(sync.stream())
+    done()
+}
 
-gulp.task("clean", function () {
-  return del("build");
-});
+function createWebp() {
+  return src("source/image/**/*.{jpg,png}")
+    .pipe(webp({quality: 85}))
+    .pipe(dest("production/image"))
+    .pipe(sync.stream())
+  }
 
-gulp.task("build", gulp.series("clean", "copy", "css", "sprite", "html"));
-gulp.task("start", gulp.series("build", "server"));
+function sprite() {
+  return src(["source/image/**/*.svg"])
+    .pipe(svgstore({
+      inlineSvg: true
+    }))
+    .pipe(rename("sprite.svg"))
+    .pipe(dest("production/image/"))
+    .pipe(sync.stream())
+}
+
+function server(done){
+  sync.init({
+    server: {
+      baseDir: "production"
+    },
+    cors: true,
+    notify: false,
+    ui: false,
+  });
+  done();
+}
+
+function reload (done){
+  sync.reload()
+  done();
+}
+
+function watcher(){
+  watch("source/pug/**/*.pug", series(pug2html, reload));
+  watch("source/sass/**/*.scss", series(scss2css, reload));
+  watch("source/js/**/*.js", series(script, reload));
+  watch("source/*.html", series(html, reload));
+  watch("source/image/**/*.{jpg,png,svg,ico}", series(copyImages, reload));
+}
+
+exports.default = series(
+  clean,
+  fonts,
+
+  parallel(
+    pug2html,
+    html,
+    scss2css,
+    script
+  ),
+
+  series(
+    server,
+    watcher
+  )
+);
+
+exports.copies = series (
+    copy,
+    copyImages,
+    copyLibs
+)
+
+exports.imageMin = series (
+    imageMin
+)
+
+exports.webp = series (
+    sprite,
+    createWebp
+);
+
+exports.build = series(
+  clean,
+  fonts,
+
+  parallel(
+    pug2html,
+    html,
+    scss2css,
+    script
+  ),
+  series(
+    server,
+    watcher
+  )
+);

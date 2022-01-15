@@ -1,0 +1,23 @@
+header.main-header
+  .container
+    .main-header__wrapper
+      .logo
+        .logo__wrapper
+          .logo__img
+            a.logo__link(href="index.html")
+              picture
+                source(media="(min-width:768px)" srcset="image/icons/logo4x.webp")
+                source(media="(min-width:320px)" srcset="image/icons/logo2x.webp")
+                source(media="(min-width:768px)" srcset="image/icons/logo4x.png")
+                source(media="(min-width:320px)" srcset="image/icons/logo2x.png")
+                img(src="image/icons/logo2x.png" alt="logo")
+      nav.main-nav
+        ul.main-nav__list
+          li.main-nav__item
+            a.main-nav__link(href="#no__scroll") Главная
+          li.main-nav__item
+            a.main-nav__link(href="#courses") Курсы
+          li.main-nav__item
+            a.main-nav__link(href="#dates") Расписание
+        .sign
+        button.btn.btn-sign(type="button" id="sign") Зайти в кабинет
